@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Удалить анкету?</h1>
+    <p class="muted">Действие необратимое. Страница перестанет открываться, статистика и ключи доступа исчезнут.</p>
+  </div>
+</div>
+
+<div class="card danger-card">
+  <h2>{{ survey.title }}</h2>
+  {% if survey.description %}<p class="muted">{{ survey.description }}</p>{% endif %}
+  <p>
+    Собранных ответов: <strong>{{ answers_count }}</strong>.
+    {% if answers_count %}Они будут удалены вместе с анкетой.{% else %}Ответов пока нет.{% endif %}
+  </p>
+
+  <form method="post" action="/s/{{ survey.slug }}/delete" class="editor-actions">
+    <a class="btn btn-ghost" href="/dashboard">Отмена</a>
+    <button type="submit" class="btn btn-danger btn-lg">Удалить навсегда</button>
+  </form>
+</div>
+{% endblock %}

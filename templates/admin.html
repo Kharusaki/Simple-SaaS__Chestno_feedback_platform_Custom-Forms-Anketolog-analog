@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Администратор</h1>
+    <p class="muted">Настройки сайта и справочная информация.</p>
+  </div>
+  <form method="post" action="/logout">
+    <button type="submit" class="btn btn-ghost">Выйти</button>
+  </form>
+</div>
+
+<section class="paths">
+  {% for section in sections %}
+  <article class="card path-card">
+    <h2>{{ section.title }}</h2>
+    <p class="muted">{{ section.text }}</p>
+    <a class="btn btn-primary" href="{{ section.path }}">Открыть</a>
+  </article>
+  {% endfor %}
+</section>
+{% endblock %}

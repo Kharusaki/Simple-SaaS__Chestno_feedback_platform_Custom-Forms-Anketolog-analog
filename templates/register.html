@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="auth-card card">
+  <h1>Регистрация</h1>
+  <p class="muted small">
+    Аккаунт нужен, чтобы создавать анкеты и видеть их статистику.
+    Отвечающим на анкеты аккаунт не нужен — им достаточно ссылки.
+  </p>
+
+  <form method="post" action="/register" class="stacked-form">
+    <input type="hidden" name="next" value="{{ next }}">
+
+    <label class="field">
+      <span>Логин</span>
+      <input type="text" name="username" required autofocus autocomplete="username"
+             value="{{ values.username|default('') }}">
+      {% if errors.username %}
+      <span class="field-error">{{ errors.username }}</span>
+      {% else %}
+      <span class="field-hint">От 3 до 64 символов: латиница, цифры, «_», «-», точка.</span>
+      {% endif %}
+    </label>
+
+    <label class="field">
+      <span>Пароль</span>
+      <input type="password" name="password" required autocomplete="new-password">
+      {% if errors.password %}
+      <span class="field-error">{{ errors.password }}</span>
+      {% else %}
+      <span class="field-hint">Не короче 6 символов.</span>
+      {% endif %}
+    </label>
+
+    <label class="field">
+      <span>Пароль ещё раз</span>
+      <input type="password" name="password_repeat" required autocomplete="new-password">
+      {% if errors.password_repeat %}
+      <span class="field-error">{{ errors.password_repeat }}</span>
+      {% endif %}
+    </label>
+
+    <button type="submit" class="btn btn-primary">Создать аккаунт</button>
+  </form>
+
+  <p class="muted small auth-alt">
+    Уже есть аккаунт? <a href="/login">Войти</a>.
+  </p>
+</div>
+{% endblock %}

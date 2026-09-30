@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="status-page">
+  <div class="status-icon">Ответ принят</div>
+  <h1>Спасибо за ответ!</h1>
+  <p class="muted">Ваш ответ на анкету «{{ survey.title }}» сохранён.</p>
+
+  {% if review is defined and review.is_active %}
+    <section class="review-result">
+      {% if review.total %}
+        <p class="review-score">
+          <strong>{{ review_label }}</strong>
+          <span class="muted">правильных ответов</span>
+        </p>
+        <div class="review-meter" role="img"
+             aria-label="Результат {{ review_label }}">
+          <div class="review-meter-fill" style="width: {{ review.percent }}%"></div>
+        </div>
+      {% else %}
+        <p class="muted review-empty">
+          Этот тест не оценивается: автор не отметил правильные ответы.
+        </p>
+      {% endif %}
+
+      {% if review.shows_answers and review.questions %}
+        <h2 class="review-heading">Разбор ответов</h2>
+        <ol class="review-list">
+          {% for item in review.questions %}
+            <li class="review-item {{ 'is-correct' if item.is_correct else 'is-wrong' }}">
+              <p class="review-question">{{ item.text }}</p>
+              {% if item.is_skipped %}
+                <p class="review-note">Без ответа</p>
+              {% else %}
+                <p class="review-given">
+                  <span class="review-label">Ваш ответ:</span>
+                  {{ item.given_text }}
+                </p>
+                <p class="review-verdict">
+                  {{ "Верно" if item.is_correct else "Неверно" }}
+                </p>
+              {% endif %}
+              {% if item.correct_text %}
+                <p class="review-correct">
+                  <span class="review-label">Правильный ответ:</span>
+                  {{ item.correct_text }}
+                </p>
+              {% endif %}
+              {% if item.explanation %}
+                <p class="review-explanation">{{ item.explanation }}</p>
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ol>
+      {% endif %}
+    </section>
+  {% endif %}
+
+  <p class="muted small">Спасибо, что помогаете нам становиться лучше.</p>
+</div>
+{% endblock %}

@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% block head %}
+<meta name="robots" content="noindex">
+<style>
+  /* Блок графика скрыт по умолчанию: Chart.js грузится с CDN, и без сети
+     канвас остался бы пустым прямоугольником. Показывать его будет скрипт,
+     когда библиотека загрузилась. */
+  .chart-box { position: relative; height: 260px; margin-top: 18px; }
+  .chart-box[hidden] { display: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="stats-page">
+  <header class="page-head">
+    <div>
+      <h1>{{ survey.title }}</h1>
+      <p class="muted">Статистика ответов</p>
+    </div>
+    <div class="page-head-actions">
+      <a class="btn btn-ghost" href="/s/{{ survey.slug }}" target="_blank" rel="noopener">Открыть анкету</a>
+      <a class="btn btn-ghost" href="/dashboard">К списку</a>
+      <a class="btn btn-primary" href="/s/{{ survey.slug }}/stats.csv">Скачать CSV</a>
+    </div>
+  </header>
+
+  <section class="stat-cards">
+    <div class="stat-card">
+      <span class="stat-value">{{ stats.total_responses }}</span>
+      <span class="stat-label">{{ stats.total_responses | plural('ответ', 'ответа', 'ответов') }}</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-value">{{ stats.questions | length }}</span>
+      <span class="stat-label">{{ stats.questions | length | plural('вопрос', 'вопроса', 'вопросов') }}</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-value">{{ 'Открыт' if survey.is_open else 'Закрыт' }}</span>
+      <span class="stat-label">Статус анкеты</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-value stat-value-sm">{{ survey.created_at.strftime('%d.%m.%Y') }}</span>
+      <span class="stat-label">Создан</span>
+    </div>
+  </section>
+
+  {% if stats.total_responses == 0 %}
+  <div class="card empty-state">
+    <p class="empty-title">Ответов пока нет</p>
+    <p class="muted">Поделитесь ссылкой на анкету — и статистика появится здесь автоматически.</p>
+    <code class="share-link">{{ base_url }}/s/{{ survey.slug }}</code>
+  </div>
+  {% else %}
+
+  <section class="stats-questions">
+    {% for qs in stats.questions %}
+    <article class="card stat-question" id="stat-q{{ qs.question.id }}">
+      <header class="stat-question-head">
+        <span class="question-number">{{ loop.index }}</span>
+        <div>
+          <h3 class="stat-question-text">{{ qs.question.text }}</h3>
+          <p class="muted small">
+            {{ qs.question.type }} · ответили {{ qs.answered | plural('человек', 'человека', 'человек') }}
+            ({{ qs.percent_answered }}%)
+            {% if qs.skipped %}· пропустили {{ qs.skipped }}{% endif %}
+          </p>
+        </div>
+      </header>
+
+      {% if not qs.has_data %}
+      <p class="muted">Пока нет ответов на этот вопрос.</p>
+
+      {% elif qs.question.type == 'scale' %}
+      <div class="scale-summary">
+        <div class="scale-average">
+          <span class="scale-average-value">{{ qs.average }}</span>
+          <span class="muted small">средняя оценка из {{ qs.question.scale_max }}</span>
+        </div>
+        <div class="muted small">мин {{ qs.min_value }} · макс {{ qs.max_value }}</div>
+      </div>
+      <ul class="bar-list">
+        {% for option in qs.options %}
+        <li class="bar-row">
+          <span class="bar-label">{{ option.text }}</span>
+          <span class="bar-track">
+            <span class="bar-fill" style="width: {{ option.percent }}%"></span>
+          </span>
+          <span class="bar-count">{{ option.count }} · {{ option.percent }}%</span>
+        </li>
+        {% endfor %}
+      </ul>
+
+      {% elif qs.question.type == 'text' %}
+      <p class="muted small">Заполненных ответов: {{ qs.text.total_answered }}</p>
+      {% if qs.text.words %}
+      <ul class="tag-cloud">
+        {% for word in qs.text.words %}
+        <li class="tag-cloud-item" style="font-size: {{ word.font_size }}rem"
+            title="упоминаний: {{ word.count }}">{{ word.text }}</li>
+        {% endfor %}
+      </ul>
+      <p class="muted small">
+        Показано {{ qs.text.words | length }} из {{ qs.text.words_total }} различных слов.
+        Чем крупнее слово, тем чаще его писали.
+      </p>
+      {% endif %}
+      {% if qs.text.previews %}
+      <details class="raw-answers">
+        <summary class="muted small">Показать сами ответы</summary>
+        <ul class="text-previews">
+          {% for preview in qs.text.previews %}
+          <li>«{{ preview }}{% if preview|length >= 60 %}…{% endif %}»</li>
+          {% endfor %}
+        </ul>
+      </details>
+      {% endif %}
+
+      {% else %}
+      <ul class="bar-list">
+        {% for option in qs.options %}
+        <li class="bar-row">
+          <span class="bar-label">{{ option.text }}</span>
+          <span class="bar-track">
+            <span class="bar-fill" style="width: {{ option.percent }}%"></span>
+          </span>
+          <span class="bar-count">{{ option.count }} · {{ option.percent }}%</span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+
+      {% if qs.has_data and qs.question.type != 'text' %}
+      <div class="chart-box" data-chart-for="{{ qs.question.id }}" hidden>
+        <canvas id="chart-q{{ qs.question.id }}"></canvas>
+      </div>
+      {% endif %}
+    </article>
+    {% endfor %}
+  </section>
+
+  <section class="card recent-answers">
+    <h2 class="section-title">Последние ответы</h2>
+    {% if stats.recent %}
+    <div class="table-scroll">
+      <table class="answers-table">
+        <thead>
+          <tr>
+            <th>Дата</th>
+            {% for qs in stats.questions %}<th>{{ qs.question.text }}</th>{% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in stats.recent %}
+          <tr>
+            <td class="nowrap">{{ row.submitted_at.strftime('%d.%m.%Y %H:%M') }}</td>
+            {% for cell in row.cells %}
+            <td>{{ cell.value if cell.value else '—' }}</td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="muted">Пока нет завершённых ответов.</p>
+    {% endif %}
+  </section>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if charts %}
+<script src="{{ chart_cdn }}" defer></script>
+<script src="/static/js/stats_charts.js" defer></script>
+<script id="charts-data" type="application/json">{{ charts | tojson }}</script>
+{% endif %}
+{% endblock %}

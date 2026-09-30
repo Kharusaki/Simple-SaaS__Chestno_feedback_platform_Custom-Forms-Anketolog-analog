@@ -1,0 +1,70 @@
+# Приложение + Redis. Без Redis приложение тоже работает (in-memory фолбэк),
+# но в нескольких процессах счётчики лимитов и кэш не будут общими.
+#
+# Запуск:
+#   docker compose up --build
+#
+# SECRET_KEY обязателен. Compose берёт его из переменной окружения, а если её
+# нет — из `.env` в корне проекта, который приложение создаёт само при первом
+# запуске, так что локально `docker compose up` работает без подготовки.
+# На сервере, где `.env` нет, compose остановится с требованием задать ключ:
+#   export SECRET_KEY=$(python -c "import secrets; print(secrets.token_urlsafe(48))")
+#
+# Проброс порта: http://localhost:8000
+#
+# Внимание: `docker compose down -v` удаляет том с базой вместе с ответами.
+# Обычный `docker compose down` её не трогает.
+
+services:
+  app:
+    build: .
+    image: mini-surveys:latest
+    restart: unless-stopped
+    # Приложение идёт первым процессом, а зомби-процессы убирает только
+    # init. Без него PID 1 ничего не подбирает за умершими детьми.
+    init: true
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: sqlite:////data/survey.db
+      REDIS_URL: redis://redis:6379/0
+      REDIS_TTL_SECONDS: "30"
+      # Ключ обязателен, а не имеет значение по умолчанию. Публичный ключ из
+      # учебных материалов подписывал бы все cookie одинаково, и такой сервер
+      # нельзя ставить в интернет. `:?` заставляет compose остановиться с этим
+      # сообщением, пока переменная не задана. Сгенерировать ключ:
+      #   export SECRET_KEY=$(python -c "import secrets; print(secrets.token_urlsafe(48))")
+      SECRET_KEY: ${SECRET_KEY:?задайте переменную окружения SECRET_KEY}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      DEBUG: ${DEBUG:-false}
+      APP_NAME: ${APP_NAME:-ЧЕСТНО}
+      RATE_LIMIT_CREATE_PER_HOUR: "20"
+      RATE_LIMIT_SUBMIT_PER_MINUTE: "10"
+      RATE_LIMIT_PAGE_PER_MINUTE: "300"
+      # Учётка администратора создаётся при первом запуске, если её ещё нет.
+      # Пароль по умолчанию известен всем, поэтому смените его сразу после
+      # первого входа: значения ниже нужны только для создания учётки.
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
+    volumes:
+      - survey-data:/data
+      - media-data:/app/media
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # Данные Redis не критичны: потеря кэша просто пересчитает статистику.
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  survey-data:
+  # Картинки оформления: фонов, логотипов и обложек анкет.
+  media-data:

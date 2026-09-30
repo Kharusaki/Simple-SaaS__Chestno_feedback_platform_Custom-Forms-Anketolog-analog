@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Мои анкеты</h1>
+    <p class="muted">Всего анкет: {{ total_surveys }} · ответов собрано: {{ total_answers }}</p>
+  </div>
+  <a class="btn btn-primary" href="/surveys/new">+ Новая анкета</a>
+</div>
+
+{% if surveys %}
+<div class="survey-list">
+  {% for item in surveys %}
+  {% set survey = item.survey %}
+  <article class="survey-card">
+    <div class="survey-card-main">
+      <h3>
+        <a href="/s/{{ survey.slug }}">{{ survey.title }}</a>
+      </h3>
+      {% if survey.description %}<p class="muted">{{ survey.description }}</p>{% endif %}
+      <div class="survey-meta">
+        <code>{{ base_url }}/s/{{ survey.slug }}</code>
+        <span class="tag">{{ item.questions_count | plural('вопрос', 'вопроса', 'вопросов') }}</span>
+        <span class="tag tag-accent">{{ item.answers_count | plural('ответ', 'ответа', 'ответов') }}</span>
+        {% if survey.is_open %}
+        <span class="tag tag-success">приём открыт</span>
+        {% else %}
+        <span class="tag tag-closed">приём закрыт</span>
+        {% endif %}
+        <span class="muted small">создан {{ survey.created_at.strftime('%d.%m.%Y') }}</span>
+      </div>
+    </div>
+    <div class="survey-card-actions">
+      <a class="btn btn-sm btn-ghost" href="/s/{{ survey.slug }}/stats">Статистика</a>
+      <button class="btn btn-sm btn-ghost copy-btn" data-copy="{{ base_url }}/s/{{ survey.slug }}" type="button">Копировать ссылку</button>
+      <a class="btn btn-sm btn-primary" href="/s/{{ survey.slug }}/edit">Редактировать</a>
+      <details class="card-menu">
+        <summary class="btn btn-sm btn-ghost" title="Управление анкетой">Управление</summary>
+        <div class="card-menu-list">
+          <a class="menu-item" href="/s/{{ survey.slug }}/settings">Ключи и ссылки</a>
+          <form method="post" action="/s/{{ survey.slug }}/open">
+            {% if survey.is_open %}
+            <button class="menu-item" type="submit">Остановить приём ответов</button>
+            {% else %}
+            <button class="menu-item" type="submit">Возобновить приём ответов</button>
+            {% endif %}
+          </form>
+          <a class="menu-item menu-item-danger" href="/s/{{ survey.slug }}/delete">Удалить анкету</a>
+        </div>
+      </details>
+    </div>
+  </article>
+  {% endfor %}
+</div>
+{% else %}
+  <div class="empty-state">
+    <span class="empty-icon">Пока пусто</span>
+    <h2 class="empty-title">Пока нет ни одной анкеты</h2>
+  <p class="muted">Создайте первую анкету — она сразу получит уникальную ссылку для прохождения.</p>
+  <a class="btn btn-primary btn-lg" href="/surveys/new">Создать анкету</a>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/copy.js" defer></script>
+{% endblock %}

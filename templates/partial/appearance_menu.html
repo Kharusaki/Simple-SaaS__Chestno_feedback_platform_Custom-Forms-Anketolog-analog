@@ -1,0 +1,114 @@
+{# Единое меню кастомизации анкеты: тема, шрифт, свои цвета и живое превью.
+
+   Подключается и в форме создания, и в редакторе. Значения полей приходят
+   в `appearance`, все три места обязаны передавать его одинаково —
+   иначе превью и сохранённая анкета разойдутся. #}
+<section class="card appearance-card" data-appearance>
+  <h2>Оформление</h2>
+  <p class="muted small">
+    Цвета и шрифт — только этой анкеты. Общий фон и логотип сайта настраивает
+    администратор. Превью перерисовывается сразу, а кнопка «Применить» под
+    каждым выбором подтверждает, что именно он попал в анкету.
+  </p>
+
+  <script type="application/json" data-appearance-catalog>{{ appearance_catalog | tojson }}</script>
+
+  <div class="appearance-grid">
+    <div class="appearance-controls">
+      <div class="field">
+        <label for="theme">Цветовая тема</label>
+        <select id="theme" name="theme" data-theme-select>
+          {% for value, label in theme_choices %}
+          <option value="{{ value }}" {% if appearance.theme == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <div class="appearance-apply">
+          <button type="button" class="btn btn-sm btn-ghost" data-apply="theme">
+            Применить тему
+          </button>
+        </div>
+        <p class="field-hint">Готовая палитра целиком: фон, текст, рамки, акцент.</p>
+      </div>
+
+      <div class="field">
+        <label for="font">Шрифт</label>
+        <select id="font" name="font" data-font-select>
+          {% for group, options in font_groups %}
+          <optgroup label="{{ group }}">
+            {% for value, label, family in options %}
+            <option value="{{ value }}" data-google="{{ family }}"
+                    {% if appearance.font == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </optgroup>
+          {% endfor %}
+        </select>
+        <div class="appearance-apply">
+          <button type="button" class="btn btn-sm btn-ghost" data-apply="font">
+            Применить шрифт
+          </button>
+        </div>
+        <p class="field-hint">
+          Шрифты из Google Fonts подгружаются из сети. Если сети нет, страница
+          останется на системном шрифте — внешний шрифт здесь украшением,
+          а не условием работы.
+        </p>
+      </div>
+
+      <div class="appearance-colors" data-colors>
+        <span class="frame-label">Свои цвета</span>
+        {% for field in color_fields %}
+        {# Контрол цвета собран как в обычных редакторах форм: крупный
+           образец, рядом точное значение, рядом кнопки. Поле значения
+           показывает действующий цвет ВСЕГДА — свой, если он задан, иначе
+           цвет темы. Раньше здесь стоял placeholder «#ffffff», и он
+           читался как настоящее значение: человек видел белый цвет,
+           применял белый к светлой теме и заключал, что превью сломано.
+           Настоящее значение (свой цвет или пусто) едет в скрытом поле,
+           поэтому «цвет темы» и «свой цвет» не путаются при сохранении. #}
+        <div class="color-field" data-color-field="{{ field.name }}">
+          <input type="color" class="color-picker" data-color-picker="{{ field.name }}"
+                 value="{{ appearance.get(field.name) or defaults.get(field.name) }}"
+                 aria-label="{{ field.label }} — выбрать цвет">
+          <div class="color-body">
+            <span class="color-caption">{{ field.label }}</span>
+            <div class="color-line">
+              <input type="text" class="color-hex" data-color-text="{{ field.name }}"
+                     value="{{ appearance.get(field.name) or defaults.get(field.name) }}"
+                     maxlength="7" spellcheck="false" inputmode="text"
+                     aria-label="{{ field.label }} — код цвета">
+              <input type="hidden" name="{{ field.name }}"
+                     data-color-value="{{ field.name }}"
+                     value="{{ appearance.get(field.name) or '' }}">
+              <button type="button" class="btn btn-sm btn-primary color-apply"
+                      data-apply-color="{{ field.name }}">Применить</button>
+              <button type="button" class="btn btn-sm btn-ghost color-reset"
+                      data-color-reset="{{ field.name }}"
+                      {% if not appearance.get(field.name) %}hidden{% endif %}>Цвет темы</button>
+            </div>
+            <p class="field-hint">{{ field.hint }}</p>
+            <p class="field-error" data-color-error="{{ field.name }}">{{ errors.get(field.name, '') }}</p>
+          </div>
+        </div>
+        {% endfor %}
+        <button type="button" class="btn btn-sm btn-ghost" data-colors-reset>
+          Вернуть цвета темы
+        </button>
+      </div>
+    </div>
+
+    <div class="appearance-preview">
+      <span class="frame-label">Так анкета будет выглядеть</span>
+      <div class="preview-frame themed" data-preview style="{{ theme_css }}">
+        <p class="preview-title" data-preview-title>{{ preview_title or 'Название анкеты' }}</p>
+        <p class="preview-text" data-preview-description>{{ preview_description or 'Описание анкеты' }}</p>
+        <p class="preview-question"><span class="preview-number">1</span> Пример вопроса</p>
+        <div class="preview-choices">
+          <span class="preview-choice">Отлично</span>
+          <span class="preview-choice">Неплохо</span>
+        </div>
+        <span class="preview-button">Отправить ответ</span>
+      </div>
+      <p class="preview-status" data-preview-status role="status" aria-live="polite"></p>
+    </div>
+  </div>
+</section>

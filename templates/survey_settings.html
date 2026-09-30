@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Ключи и ссылки</h1>
+    <p class="muted"><a href="/s/{{ survey.slug }}">{{ survey.title }}</a></p>
+  </div>
+  <div class="page-head-actions">
+    <a class="btn btn-ghost" href="/s/{{ survey.slug }}/stats?{% if key %}key={{ key }}&amp;{% endif %}">Статистика</a>
+    {% if is_owner %}<a class="btn btn-ghost" href="/dashboard">К анкетам</a>{% endif %}
+  </div>
+</div>
+
+{% if not is_owner %}
+<div class="notice notice-info">
+  Вы вошли по ключу с правом редактирования. Управление ключами доступно только владельцу.
+</div>
+{% endif %}
+
+{% if saved %}<div class="notice notice-success">{{ saved }}</div>{% endif %}
+{% if request.query_params.get('key_added') %}<div class="notice notice-success">Ключ создан. Скопируйте ссылку и отправьте коллеге.</div>{% endif %}
+{% if request.query_params.get('key_revoked') %}<div class="notice notice-success">Ключ отозван — ссылка больше не работает.</div>{% endif %}
+
+<section class="card">
+  <h2>Ссылки</h2>
+  <div class="share-row">
+    <div>
+      <p class="muted small">Заполнить анкету</p>
+      <code>{{ base_url }}/s/{{ survey.slug }}</code>
+    </div>
+    <button class="btn btn-sm btn-ghost copy-btn" data-copy="{{ base_url }}/s/{{ survey.slug }}" type="button">Копировать</button>
+  </div>
+  {% if is_owner and primary_key %}
+  <div class="share-row">
+    <div>
+      <p class="muted small">Статистика по ключу — для коллеги</p>
+      <code>{{ base_url }}/s/{{ survey.slug }}/stats?key={{ primary_key.token }}</code>
+    </div>
+    <button class="btn btn-sm btn-ghost copy-btn" data-copy="{{ base_url }}/s/{{ survey.slug }}/stats?key={{ primary_key.token }}" type="button">Копировать</button>
+  </div>
+  <div class="share-row">
+    <div>
+      <p class="muted small">Вход по ключу</p>
+      <code>{{ base_url }}/k/{{ primary_key.token }}</code>
+    </div>
+    <button class="btn btn-sm btn-ghost copy-btn" data-copy="{{ base_url }}/k/{{ primary_key.token }}" type="button">Копировать</button>
+  </div>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>Ключи доступа</h2>
+  {% if not is_owner %}
+    <p class="muted">Список ключей видит только владелец анкеты.</p>
+  {% else %}
+    <p class="muted">
+      Ключ без права правки открывает только статистику. Ключ с правом правки
+      позволяет менять анкету без входа в дашборд. Основной ключ отозвать нельзя.
+    </p>
+
+    {% if key_error %}
+    <div class="notice notice-error">{{ key_error }}</div>
+    {% endif %}
+
+    <table class="table keys-table">
+      <thead>
+        <tr>
+          <th>Название</th>
+          <th>Доступ</th>
+          <th>Создан</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in keys %}
+        {% set is_primary = primary_key and item.id == primary_key.id %}
+        <tr>
+          <td>{{ item.label }}{% if is_primary %} <span class="tag">основной</span>{% endif %}</td>
+          <td>
+            {% if item.can_edit %}<span class="tag tag-accent">правка и статистика</span>
+            {% else %}<span class="tag">только статистика</span>{% endif %}
+          </td>
+          <td class="muted small">{{ item.created_at.strftime('%d.%m.%Y') }}</td>
+          <td class="keys-table-actions">
+            <button class="btn btn-sm btn-ghost copy-btn" data-copy="{{ base_url }}/k/{{ item.token }}" type="button">Копировать ссылку</button>
+            {% if is_primary %}
+            <span class="muted small">не отзывается</span>
+            {% else %}
+            <form method="post" action="/s/{{ survey.slug }}/keys/{{ item.id }}/revoke">
+              <button class="btn btn-sm btn-danger" type="submit">Отозвать</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    {% if key_limit_reached %}
+    <p class="muted">Достигнут лимит в {{ max_keys }} ключей на анкету.</p>
+    {% else %}
+    <form class="key-form" method="post" action="/s/{{ survey.slug }}/keys">
+      <div class="field">
+        <label for="key-label">Название ключа</label>
+        <input id="key-label" name="label" type="text" maxlength="60" required
+               placeholder="Например, для отдела продаж" value="{{ key_label or '' }}">
+      </div>
+      <label class="checkbox-row">
+        <input type="checkbox" name="can_edit" value="1">
+        <span>Разрешить редактировать анкету</span>
+      </label>
+      <button class="btn btn-primary" type="submit">Создать ключ</button>
+    </form>
+    {% endif %}
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/copy.js" defer></script>
+{% endblock %}

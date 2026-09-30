@@ -1,0 +1,39 @@
+<section class="questions-editor">
+  <div class="questions-head">
+    <h2>Вопросы</h2>
+    <span class="muted small" id="questions-counter"></span>
+  </div>
+
+  <p class="editor-note">
+    Анкета может содержать как один вопрос, так и несколько — до {{ max_questions }}.
+    У каждого вопроса свой тип: один вариант ответа, несколько вариантов, «да/нет»,
+    шкала оценки или свободный текст. Порядок вопросов на странице совпадает
+    с порядком здесь.
+  </p>
+
+  {% if errors.get('questions') %}
+  <div class="alert alert-danger">{{ errors['questions'] }}</div>
+  {% endif %}
+
+  <div id="questions-list">
+    {% for q in form.questions %}
+    {% set index = loop.index0 %}
+    {% include "partial/question_block.html" %}
+    {% endfor %}
+  </div>
+
+  <!-- Поля внутри template обязаны иметь name с префиксом q<N>_: скрипт
+       renumber() переписывает индекс по позиции блока, а по именам строится
+       разбор формы на сервере. Без name вопрос не отправится. -->
+  <template id="question-template">
+    {% set index = 0 %}
+    {% set q = {'type': 'single', 'text': '', 'is_required': true, 'choices': ''} %}
+    {# Заготовка нового вопроса не должна нести чужую ошибку: скрипт
+       клонирует её innerHTML, и создатель увидел бы текст от другого
+       вопроса только что добавленному. #}
+    {% set errors = {} %}
+    {% include "partial/question_block.html" %}
+  </template>
+
+  <button type="button" class="btn btn-ghost" id="add-question">+ Добавить вопрос</button>
+</section>

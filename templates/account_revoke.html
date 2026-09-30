@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Отозвать все ответы?</h1>
+    <p class="muted">Статистика обнулится, но анкеты останутся на месте.</p>
+  </div>
+</div>
+
+<div class="card danger-card">
+  <h2>Отзыв ответов</h2>
+  <p>
+    Будет удалено ответов: <strong>{{ responses_count }}</strong>.
+    Анкеты, вопросы и ключи доступа сохранятся.
+  </p>
+
+  <form method="post" action="/account/revoke-responses" class="editor-actions">
+    <a class="btn btn-ghost" href="/account">Отмена</a>
+    <button type="submit" class="btn btn-danger btn-lg">Отозвать ответы</button>
+  </form>
+</div>
+{% endblock %}

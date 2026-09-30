@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Личный кабинет</h1>
+    <p class="muted">Управление аккаунтом и данными</p>
+  </div>
+  <a class="btn btn-ghost" href="/dashboard">К анкетам</a>
+</div>
+
+{% if request.query_params.revoked %}
+<div class="notice notice-success">Все ответы отозваны.</div>
+{% elif request.query_params.deleted %}
+<div class="notice notice-success">Все анкеты удалены.</div>
+{% endif %}
+
+<div class="account-grid">
+  <div class="card">
+    <h2>Аккаунт</h2>
+    <dl class="account-info">
+      <dt>Логин</dt>
+      <dd>{{ user.username }}</dd>
+      <dt>Роль</dt>
+      <dd>{% if user.is_admin %}Администратор{% else %}Создатель анкет{% endif %}</dd>
+      <dt>Создан</dt>
+      <dd>{{ user.created_at.strftime('%d.%m.%Y') }}</dd>
+    </dl>
+    <a class="btn btn-primary" href="/account/password">Сменить пароль</a>
+  </div>
+
+  <div class="card">
+    <h2>Данные</h2>
+    <p class="muted">
+      Анкет: <strong>{{ surveys_count }}</strong> ·
+      Ответов собрано: <strong>{{ responses_count }}</strong>
+    </p>
+    <div class="account-actions">
+      <a class="btn btn-ghost" href="/account/revoke-responses">Отозвать все ответы</a>
+      <a class="btn btn-ghost" href="/account/delete-surveys">Удалить все анкеты</a>
+    </div>
+  </div>
+
+  <div class="card danger-card">
+    <h2>Опасная зона</h2>
+    <p class="muted">
+      Удаление аккаунта необратимо: все анкеты, ответы и ключи доступа
+      будут уничтожены.
+    </p>
+    <a class="btn btn-danger" href="/account/delete">Удалить аккаунт</a>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Удалить все анкеты?</h1>
+    <p class="muted">Действие необратимо. Анкеты, ответы и ключи доступа будут уничтожены.</p>
+  </div>
+</div>
+
+<div class="card danger-card">
+  <h2>Удаление всех анкет</h2>
+  <p>
+    Будет удалено анкет: <strong>{{ surveys_count }}</strong>.
+    Ответы и файлы оформления также будут уничтожены.
+  </p>
+
+  <form method="post" action="/account/delete-surveys" class="editor-actions">
+    <a class="btn btn-ghost" href="/account">Отмена</a>
+    <button type="submit" class="btn btn-danger btn-lg">Удалить все анкеты</button>
+  </form>
+</div>
+{% endblock %}

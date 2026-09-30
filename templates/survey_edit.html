@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Редактирование анкеты</h1>
+    <p class="muted">Ссылка <code>{{ base_url }}/s/{{ survey.slug }}</code> не изменится — прежние ответы останутся привязаны к ней.</p>
+  </div>
+</div>
+
+{% if created %}<div class="notice notice-success">Анкета создана. Допишите вопросы, оформление и заберите ссылку для респондентов.</div>{% endif %}
+{% if saved %}<div class="notice notice-success">{{ saved }}</div>{% endif %}
+
+<form method="post" action="/s/{{ survey.slug }}/edit" class="survey-editor" id="survey-form" enctype="multipart/form-data"
+      data-max-questions="{{ max_questions }}" data-max-choices="{{ max_choices }}" novalidate>
+  {% if key %}<input type="hidden" name="key" value="{{ key }}">{% endif %}
+  <section class="card">
+    <h2>Об анкете</h2>
+    <div class="field">
+      <label for="title">Название <span class="required">*</span></label>
+      <input type="text" id="title" name="title" maxlength="200" required
+             value="{{ form.title or '' }}">
+      <p class="field-error">{{ errors.get('title', '') }}</p>
+    </div>
+    <div class="field">
+      <label for="description">Описание</label>
+      <textarea id="description" name="description" rows="3" maxlength="2000">{{ form.description or '' }}</textarea>
+    </div>
+    {% if cover %}
+    <div class="field">
+      <span class="frame-label">Обложка анкеты</span>
+      <div class="image-current">
+        <img class="image-current-preview" src="{{ cover.url }}" alt="Обложка анкеты">
+      </div>
+      <p class="field-hint">Обложка меняется в блоке «Оформление» ниже.</p>
+    </div>
+    {% endif %}
+    <div class="field">
+      <label for="review_mode">Проверка ответов</label>
+      <select id="review_mode" name="review_mode" data-review-select>
+        {% for value, label in review_modes %}
+          <option value="{{ value }}" {% if (form.review_mode or survey.review_mode) == value %}selected{% endif %}>
+            {{ label }}
+          </option>
+        {% endfor %}
+      </select>
+      <p class="field-hint">
+        Один режим на всю анкету. Правильные ответы отмечаются у вопросов
+        {% if not locked %}ниже{% else %}до того, как пришли ответы{% endif %}.
+      </p>
+      <p class="field-error">{{ errors.get('review_mode', '') }}</p>
+    </div>
+    {% if is_owner %}
+    <div class="field">
+      <label class="inline-check">
+        <input type="checkbox" name="is_open" value="1" {% if survey.is_open %}checked{% endif %}>
+        Приём ответов открыт
+      </label>
+      <p class="field-hint">Снимите галочку, чтобы приостановить заполнение: анкета перестанет открываться по ссылке, а уже собранные ответы сохранятся.</p>
+    </div>
+    {% else %}
+    <div class="field">
+      <p class="editor-note">Приём ответов: <strong>{% if survey.is_open %}открыт{% else %}приостановлен{% endif %}</strong>. Остановить или возобновить анкету может только владелец.</p>
+    </div>
+    {% endif %}
+  </section>
+
+  {% if locked %}
+  <section class="card">
+    <h2>Вопросы</h2>
+    <p class="editor-note">
+      Вопросы зафиксированы: по анкете уже есть ответы, и их статистика привязана
+      к нынешнему списку. Название, описание и приём ответов менять можно.
+    </p>
+    <ol class="question-readonly">
+      {% for q in form.questions %}
+      <li>
+        <span class="question-text">{{ q.text }}</span>
+        <span class="tag">Тип вопроса: {{ type_names.get(q.type, q.type) }}</span>
+        {% if q.is_required %}<span class="tag">обязательный</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ol>
+  </section>
+  {% else %}
+  {% include "partial/questions_editor.html" %}
+  {% endif %}
+
+  <div class="editor-actions">
+    <div class="editor-actions-right">
+      <a class="btn btn-ghost" href="/dashboard">Отмена</a>
+      <button type="submit" class="btn btn-primary btn-lg">Сохранить</button>
+    </div>
+  </div>
+</form>
+
+<section class="card">
+  <h2>Оформление</h2>
+  <p class="muted">
+    Обложка, тема и шрифт — только этой анкеты. Общий фон и логотип сайта
+    настраивает администратор. Здесь изменения применяются сразу, отдельной
+    кнопки «Сохранить» не нужно.
+  </p>
+
+  {% if appearance_error %}
+  <div class="notice notice-error">{{ appearance_error }}</div>
+  {% endif %}
+
+  <form method="post" action="/s/{{ survey.slug }}/cover" enctype="multipart/form-data" class="cover-form">
+    {% if key %}<input type="hidden" name="key" value="{{ key }}">{% endif %}
+    <span class="frame-label">Обложка</span>
+    {% if cover %}
+    <div class="cover-row">
+      <div class="cover-row-main">
+        <img class="cover-preview" src="{{ cover.url }}" alt="Обложка анкеты">
+        <p class="muted small">Показывается картинкой сверху анкеты, до названия.</p>
+      </div>
+      <div class="cover-row-actions">
+        <label class="file-field">
+          <span class="muted small">Заменить</span>
+          <input type="file" name="cover" accept="image/png,image/jpeg,image/webp,image/gif">
+        </label>
+        <button class="btn btn-sm btn-danger" type="submit" name="clear" value="1">Убрать обложку</button>
+      </div>
+    </div>
+    {% else %}
+    <div class="cover-row">
+      <label class="file-field cover-row-main">
+        <span class="muted small">PNG, JPEG, WebP или GIF, до 2 МБ. Необязательно.</span>
+        <input type="file" name="cover" accept="image/png,image/jpeg,image/webp,image/gif">
+      </label>
+      <div class="cover-row-actions">
+        <button class="btn btn-sm btn-primary" type="submit">Загрузить обложку</button>
+      </div>
+    </div>
+    {% endif %}
+  </form>
+
+  <form method="post" action="/s/{{ survey.slug }}/appearance" class="appearance-save">
+    {% if key %}<input type="hidden" name="key" value="{{ key }}">{% endif %}
+    {% include "partial/appearance_menu.html" %}
+    <div class="editor-actions">
+      <button class="btn btn-primary" type="submit">Сохранить оформление</button>
+      <p class="muted small">Оформление применится к анкете сразу после сохранения.</p>
+    </div>
+  </form>
+</section>
+{% endblock %}
+
+{% block scripts %}
+{% if not locked %}<script src="/static/js/survey_builder.js" defer></script>{% endif %}
+<script src="/static/js/survey_appearance.js" defer></script>
+{% endblock %}

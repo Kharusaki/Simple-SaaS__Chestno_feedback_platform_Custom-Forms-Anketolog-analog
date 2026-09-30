@@ -1,0 +1,18 @@
+# --- Обязательный стек из ТЗ ---
+fastapi==0.121.2
+uvicorn[standard]==0.40.0
+jinja2==3.1.6
+SQLAlchemy==2.0.44
+python-multipart==0.0.20
+
+# --- Конфигурация и сессии ---
+pydantic-settings==2.13.1
+itsdangerous==2.2.0
+
+# --- Дополнительно из ТЗ ---
+redis==6.4.0
+
+# --- Тесты и качество ---
+pytest==8.4.2
+pytest-xdist==3.8.0
+httpx==0.28.1

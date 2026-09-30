@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Новая анкета</h1>
+    <p class="muted">После сохранения анкета получит уникальную ссылку для прохождения.</p>
+  </div>
+</div>
+
+  <section class="card">
+    <h2>Начните с шаблона</h2>
+    <p class="muted small">
+      Готовые вопросы можно поправить или удалить — шаблон лишь заполняет
+      форму, анкета создаётся из того, что вы оставите.
+    </p>
+    <div class="preset-grid">
+      {% for preset in presets %}
+      <a class="preset-card" href="/surveys/new?preset={{ preset.key }}">
+        <span class="preset-card-title">{{ preset.label }}</span>
+        <span class="preset-card-hint">{{ preset.hint }}</span>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+
+  <form method="post" action="/surveys/new" class="survey-editor" id="survey-form" enctype="multipart/form-data"
+      data-max-questions="{{ max_questions }}" data-max-choices="{{ max_choices }}" novalidate>
+  <section class="card">
+    <h2>Об анкете</h2>
+    <div class="field">
+      <label for="title">Название <span class="required">*</span></label>
+      <input type="text" id="title" name="title" maxlength="200" required
+             value="{{ form.title or '' }}" placeholder="Например: анкета после покупки">
+      <p class="field-error">{{ errors.get('title', '') }}</p>
+    </div>
+    <div class="field">
+      <label for="description">Описание</label>
+      <textarea id="description" name="description" rows="3" maxlength="2000"
+                placeholder="Что нужно ответить и зачем">{{ form.description or '' }}</textarea>
+    </div>
+    <div class="field">
+      <span class="frame-label">Обложка анкеты</span>
+      {% if cover %}
+      <div class="image-current">
+        <img class="image-current-preview" src="{{ cover.url }}" alt="Обложка анкеты">
+      </div>
+      {% endif %}
+      <label class="file-field">
+        <span class="muted small">Картинка сверху анкеты. PNG, JPEG, WebP или GIF, до 2 МБ. Необязательно.</span>
+        <input type="file" name="cover" accept="image/png,image/jpeg,image/webp,image/gif">
+      </label>
+      <p class="field-error">{{ errors.get('cover', '') }}</p>
+    </div>
+    <div class="field">
+      <label for="review_mode">Проверка ответов</label>
+      <select id="review_mode" name="review_mode" data-review-select>
+        {% for value, label in review_modes %}
+          <option value="{{ value }}" {{ 'selected' if form.review_mode == value }}>
+            {{ label }}
+          </option>
+        {% endfor %}
+      </select>
+      <p class="muted small">
+        Один режим на всю анкету. Отметьте правильные ответы у вопросов,
+        чтобы респондент увидел свой балл после отправки.
+      </p>
+      <p class="field-error">{{ errors.get('review_mode', '') }}</p>
+    </div>
+  </section>
+
+  {% include "partial/questions_editor.html" %}
+
+  {% include "partial/appearance_menu.html" %}
+
+  <div class="editor-actions">
+    <div class="editor-actions-right">
+      <a class="btn btn-ghost" href="/dashboard">Отмена</a>
+      <button type="submit" class="btn btn-primary btn-lg">Создать анкету</button>
+    </div>
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/survey_builder.js" defer></script>
+<script src="/static/js/survey_appearance.js" defer></script>
+{% endblock %}

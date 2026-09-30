@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <p class="hero-brand">{{ app_name }}</p>
+  <h1>Простые формы для честной обратной связи</h1>
+  <p class="lead">
+    Создайте анкету за минуту, раздайте ссылку — ответы придут в базу данных,
+    а статистика посчитается сама.
+  </p>
+  <div class="hero-actions">
+    <a class="btn btn-primary btn-lg" href="/surveys/new">Создать анкету</a>
+    <a class="btn btn-ghost btn-lg" href="/dashboard">Мои анкеты</a>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-head">
+    <span class="eyebrow">С чего начать</span>
+  </div>
+
+  <div class="paths">
+    <article class="path-card">
+      <span class="path-index">01 — Автор</span>
+      <h2>Я создаю анкеты</h2>
+      <p>
+        Заведите аккаунт, составьте вопросы, получите ссылку и следите за ответами.
+        Отвечающим аккаунт не нужен — им достаточно ссылки.
+      </p>
+      <a class="btn btn-primary" href="/surveys/new">Создать анкету</a>
+      <a class="btn btn-ghost" href="/dashboard">Мои анкеты и статистика</a>
+    </article>
+
+    <article class="path-card">
+      <span class="path-index">02 — Респондент</span>
+      <h2>Я отвечаю на анкеты</h2>
+      <p>
+        Прохожу по ссылке без регистрации. Свои ответы вижу в разделе «Мои ответы»,
+        чужие — нет.
+      </p>
+      <a class="btn btn-primary" href="/my">Мои ответы</a>
+    </article>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-head">
+    <span class="eyebrow">Что внутри</span>
+  </div>
+
+  <div class="features">
+    <article class="card">
+      <span class="card-icon">01</span>
+      <h3>Уникальная ссылка</h3>
+      <p>Каждая анкета получает собственную короткую ссылку вида <code>/s/a82jd92k</code>. Никаких статических заглушек.</p>
+    </article>
+    <article class="card">
+      <span class="card-icon">02</span>
+      <h3>Пять типов вопросов</h3>
+      <p>Один вариант, несколько вариантов, да/нет, шкала от 1 до 10 и свободный текст.</p>
+    </article>
+    <article class="card">
+      <span class="card-icon">03</span>
+      <h3>Статистика сразу</h3>
+      <p>Распределение ответов, средние значения и графики Chart.js. Плюс выгрузка в CSV.</p>
+    </article>
+    <article class="card">
+      <span class="card-icon">04</span>
+      <h3>Приватные результаты</h3>
+      <p>Проходить анкету можно без регистрации, а вот результаты видит только автор анкеты и те, кому он дал ключ.</p>
+    </article>
+  </div>
+</section>
+
+{% endblock %}

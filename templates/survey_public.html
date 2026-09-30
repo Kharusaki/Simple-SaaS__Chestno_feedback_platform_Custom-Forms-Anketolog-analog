@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block head %}<meta name="robots" content="noindex">{% endblock %}
+{% block content %}
+<div class="public-survey themed" style="{{ theme_css }}">
+  {% if cover_image %}
+  <img class="survey-cover" src="{{ cover_image.url }}" alt="Обложка анкеты">
+  {% endif %}
+
+  <header class="public-head">
+    <h1>{{ survey.title }}</h1>
+    {% if survey.description %}<p class="lead">{{ survey.description }}</p>{% endif %}
+    <p class="muted small">{{ questions | length | plural('вопрос', 'вопроса', 'вопросов') }} · анонимно, без регистрации</p>
+  </header>
+
+  {% if already_answered %}
+  <div class="notice notice-success already-answered" id="already-answered">
+    <strong>Вы уже заполнили эту анкету.</strong>
+    <span class="muted small">
+      Повторно отправить ответ нельзя. Свои ответы показаны ниже, общие результаты
+      автор анкеты держит закрытыми.
+    </span>
+  </div>
+
+  {% if own_answers %}
+  <section class="card own-answers" id="own-answers">
+    <h2>Ваши ответы</h2>
+    <p class="muted small">Отправлено {{ own_response.submitted_at.strftime('%d.%m.%Y в %H:%M') }}</p>
+    <dl class="answer-list">
+      {% for answer in own_answers %}
+      <div class="answer-row">
+        <dt>{{ answer.question.text }}</dt>
+        <dd>
+          {% if answer.kind == 'skipped' %}
+          <span class="muted">без ответа</span>
+          {% elif answer.kind == 'scale' %}
+          {{ answer.value_int }} из {{ answer.question.scale_max }}
+          {% else %}
+          {{ answer.value_text }}
+          {% endif %}
+        </dd>
+      </div>
+      {% endfor %}
+    </dl>
+    <a class="btn btn-sm btn-ghost" href="/my">Все мои ответы</a>
+  </section>
+  {% endif %}
+  {% endif %}
+
+  <form method="post" action="/s/{{ survey.slug }}" class="take-form" novalidate>
+    {% for question in questions %}
+    <fieldset class="question-block card" id="q{{ question.id }}">
+      <legend class="question-legend">
+        <span class="question-number">{{ loop.index }}</span>
+        <span class="question-text">{{ question.text }}</span>
+        {% if question.is_required %}<span class="required" title="Обязательный вопрос">*</span>{% endif %}
+      </legend>
+
+      {% if question.image %}
+      <img class="question-image" src="/media/{{ question.image }}" alt="" loading="lazy">
+      {% endif %}
+
+      {% if question.type == 'single' %}
+      <div class="choices">
+        {% for choice in question.choices %}
+        <label class="choice">
+          <input type="radio" name="q{{ question.id }}" value="{{ choice.text }}">
+          <span>{{ choice.text }}</span>
+        </label>
+        {% endfor %}
+      </div>
+
+      {% elif question.type == 'multiple' %}
+      <div class="choices">
+        {% for choice in question.choices %}
+        <label class="choice">
+          <input type="checkbox" name="q{{ question.id }}" value="{{ choice.text }}">
+          <span>{{ choice.text }}</span>
+        </label>
+        {% endfor %}
+      </div>
+
+      {% elif question.type == 'yes_no' %}
+      <div class="choices choices-inline">
+        <label class="choice">
+          <input type="radio" name="q{{ question.id }}" value="Да">
+          <span>Да</span>
+        </label>
+        <label class="choice">
+          <input type="radio" name="q{{ question.id }}" value="Нет">
+          <span>Нет</span>
+        </label>
+      </div>
+
+      {% elif question.type == 'scale' %}
+      <div class="scale">
+        {% for value in range(question.scale_min, question.scale_max + 1) %}
+        <label class="scale-point">
+          <input type="radio" name="q{{ question.id }}" value="{{ value }}">
+          <span class="scale-bubble">{{ value }}</span>
+        </label>
+        {% endfor %}
+      </div>
+      <div class="scale-labels">
+        <span class="muted small">{{ question.scale_min }} — {{ question.scale_max }}</span>
+      </div>
+
+      {% else %}
+      <div class="field">
+        <textarea name="q{{ question.id }}" rows="6" maxlength="2000"
+                  placeholder="Ваш ответ"></textarea>
+      </div>
+      {% endif %}
+    </fieldset>
+    {% endfor %}
+
+    <div class="take-actions">
+      {% if already_answered %}
+      <p class="muted small">Форма остаётся для просмотра, но повторная отправка заблокирована.</p>
+      {% else %}
+      <button type="submit" class="btn btn-primary btn-lg">Отправить ответ</button>
+      <p class="muted small">Ответ сохраняется в базе данных проекта. Повторная отправка с того же устройства невозможна.</p>
+      {% endif %}
+    </div>
+  </form>
+</div>
+{% endblock %}

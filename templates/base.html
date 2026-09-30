@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{% if title and title != app_name %}{{ title }} — {% endif %}{{ app_name }}{% endblock %}</title>
+  <meta name="description" content="Создавайте анкеты, собирайте ответы по ссылке и смотрите статистику.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%23d8352a%22/><rect x=%2222%22 y=%2222%22 width=%2256%22 height=%2256%22 fill=%22%23ffffff%22/></svg>">
+  <link rel="stylesheet" href="/static/css/style.css">
+  {{ google_fonts_link | safe }}
+  {% block head %}{% endblock %}
+</head>
+<body{% if background_image %} style="--site-bg: url('{{ background_image }}')"{% endif %}>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="logo" href="/">
+        {% if logo_image %}
+        <img class="logo-image" src="{{ logo_image }}" alt="{{ app_name }}">
+        {% else %}
+        <span class="logo-mark" aria-hidden="true"></span>
+        {% endif %}
+        <span>{{ app_name }}</span>
+      </a>
+      <nav class="site-nav">
+        <a href="/">Главная</a>
+        <a href="/my">Мои ответы</a>
+        {% if is_logged_in %}<a href="/dashboard">Мои анкеты</a>{% endif %}
+        {% if is_logged_in %}<a href="/account">Кабинет</a>{% endif %}
+        {% if is_admin %}<a href="/admin">Администратор</a>{% endif %}
+        {% if is_logged_in %}
+          <form method="post" action="/logout" class="inline-form">
+            <button type="submit" class="link-button">Выйти</button>
+          </form>
+        {% else %}
+          <a href="/login">Вход</a>
+          <a href="/register">Регистрация</a>
+        {% endif %}
+      </nav>
+    </div>
+  </header>
+
+  <main class="site-main">
+    <div class="container">
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <span>Учебный проект «Мини-SaaS для опросов»</span>
+      <span class="footer-links">
+        {% if is_admin %}
+        <a href="/admin/appearance">Оформление сайта</a>
+        <a href="/admin/instructions">Инструкция</a>
+        {% endif %}
+      </span>
+    </div>
+  </footer>
+
+  {% block scripts %}{% endblock %}
+
+  {% if show_password_notice %}
+  <div class="modal-backdrop" id="password-modal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="password-modal-title">
+      <h2 class="modal-title" id="password-modal-title">У вас стандартный пароль</h2>
+      <p class="modal-text">
+        Его знает любой, кто откроет сайт, поэтому чужие люди смогут зайти
+        под вашим именем и увидеть ваши анкеты. Лучше всего поменять пароль
+        прямо сейчас — это занимает полминуты.
+      </p>
+      <form method="post" action="/account/password/dismiss" class="modal-form">
+        <label class="checkbox-row">
+          <input type="checkbox" name="dont_remind" value="1">
+          <span>Не напоминать больше</span>
+        </label>
+        <div class="modal-actions">
+          <button type="submit" class="btn btn-ghost">Продолжить как есть</button>
+          <a class="btn btn-primary" href="/account/password">Сменить пароль</a>
+        </div>
+        <button type="button" class="modal-close" data-close-password-modal>Закрыть</button>
+      </form>
+    </div>
+  </div>
+  <script src="/static/js/password_notice.js" defer></script>
+  {% endif %}
+</body>
+</html>

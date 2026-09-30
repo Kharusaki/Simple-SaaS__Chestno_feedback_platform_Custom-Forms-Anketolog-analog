@@ -1,0 +1,50 @@
+# Виртуальное окружение
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# База данных (пересоздаётся через python -m database.init_db)
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+*.db-wal
+*.db-shm
+
+# Загруженные модератором картинки оформления.
+# Именно media/*, а не media/: иначе git не заходит в папку и не видит
+# исключение для .gitkeep ниже.
+media/*
+!media/.gitkeep
+
+# Секреты
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# IDE / ОС
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Логи и временное
+logs/
+*.log
+tmp/
+.cache/
+_smoke_out.txt

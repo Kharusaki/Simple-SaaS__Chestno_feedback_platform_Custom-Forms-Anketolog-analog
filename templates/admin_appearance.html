@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Оформление сайта</h1>
+    <p class="muted">Фон и логотип сайта. Обложку отдельной анкеты меняет её владелец в редакторе. Раздел доступен только администратору.</p>
+  </div>
+  <a class="btn btn-ghost" href="/admin">К админ-разделу</a>
+</div>
+
+{% if error %}
+<p class="notice notice-error">{{ error }}</p>
+{% endif %}
+
+<section class="card admin-block">
+  <h2>Фон и логотип</h2>
+  <form method="post" action="/admin/appearance" enctype="multipart/form-data" class="stacked-form">
+    <div class="upload-row">
+      <div class="upload-item">
+        <span class="field-caption">Фон сайта</span>
+        {% if background %}
+        <img class="upload-preview" src="{{ background.url }}" alt="Текущий фон">
+        {% else %}
+        <p class="muted small">Фон не задан.</p>
+        {% endif %}
+        <input type="file" name="background" accept="image/png,image/jpeg,image/webp,image/gif">
+        {% if background %}
+        <label class="checkbox-row">
+          <input type="checkbox" name="clear_background" value="1"> Убрать фон
+        </label>
+        {% endif %}
+      </div>
+
+      <div class="upload-item">
+        <span class="field-caption">Логотип</span>
+        {% if logo %}
+        <img class="upload-preview upload-preview-logo" src="{{ logo.url }}" alt="Текущий логотип">
+        {% else %}
+        <p class="muted small">Логотип не задан, показывается значок по умолчанию.</p>
+        {% endif %}
+        <input type="file" name="logo" accept="image/png,image/jpeg,image/webp,image/gif">
+        {% if logo %}
+        <label class="checkbox-row">
+          <input type="checkbox" name="clear_logo" value="1"> Убрать логотип
+        </label>
+        {% endif %}
+      </div>
+    </div>
+    <p class="muted small">PNG, JPEG, WebP или GIF, до 2 МБ. Файл проверяется по содержимому, а не по расширению.</p>
+    <button type="submit" class="btn btn-primary">Сохранить</button>
+  </form>
+</section>
+{% endblock %}

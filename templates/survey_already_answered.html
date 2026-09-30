@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="status-page">
+  <div class="status-icon">Ответ уже есть</div>
+  <h1>Ответ уже отправлен</h1>
+  <p class="muted">С этого устройства ответ на анкету «{{ survey.title }}» уже получен.</p>
+  <p class="muted small">Каждый участник отвечает один раз — так статистика остаётся честной.</p>
+  <p class="status-actions">
+    <a class="btn btn-primary" href="/s/{{ survey.slug }}">Посмотреть анкету и свои ответы</a>
+    <a class="btn btn-ghost" href="/my">Все мои ответы</a>
+  </p>
+</div>
+{% endblock %}

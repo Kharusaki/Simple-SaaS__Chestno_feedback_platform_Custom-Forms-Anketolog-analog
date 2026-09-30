@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Мои ответы</h1>
+    <p class="muted">
+      Заполнено анкет: {{ total | plural('анкета', 'анкеты', 'анкет') }}.
+      Здесь только ваши собственные ответы — без регистрации и без чужих данных.
+    </p>
+  </div>
+  <a class="btn btn-ghost" href="/surveys/new">+ Создать свою анкету</a>
+</div>
+
+{% if items %}
+<div class="my-answers-list">
+  {% for item in items %}
+  <article class="card my-answer-card">
+    <h3><a href="/s/{{ item.survey.slug }}">{{ item.survey.title }}</a></h3>
+    <p class="muted small">
+      Отправлено {{ item.response.submitted_at.strftime('%d.%m.%Y в %H:%M') }}
+      {% if not item.survey.is_open %}
+      · <span class="tag tag-closed">приём закрыт</span>
+      {% endif %}
+    </p>
+    {% if item.answers %}
+    <dl class="answer-list">
+      {% for answer in item.answers %}
+      <div class="answer-row">
+        <dt>{{ answer.question.text }}</dt>
+        <dd>
+          {% if answer.kind == 'skipped' %}
+          <span class="muted">без ответа</span>
+          {% elif answer.kind == 'scale' %}
+          {{ answer.value_int }} из {{ answer.question.scale_max }}
+          {% else %}
+          {{ answer.value_text }}
+          {% endif %}
+        </dd>
+      </div>
+      {% endfor %}
+    </dl>
+    {% else %}
+    <p class="muted small">Ответов не записано.</p>
+    {% endif %}
+  </article>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+  <span class="empty-icon">Пока пусто</span>
+  <h2 class="empty-title">Вы ещё не заполняли анкеты</h2>
+  <p class="muted">
+    Как только вы пройдёте анкету по присланной ссылке, она появится здесь вместе с вашими ответами.
+  </p>
+</div>
+{% endif %}
+{% endblock %}

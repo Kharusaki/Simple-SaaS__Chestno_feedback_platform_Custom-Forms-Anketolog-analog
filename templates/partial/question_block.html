@@ -1,0 +1,131 @@
+{% set rows = [] %}
+{% for line in (q.choices or '').split('\n') %}
+{% if line.strip() %}{% set _ = rows.append(line.strip()) %}{% endif %}
+{% endfor %}
+{% set qtype = q.type or 'single' %}
+{% set marker = 'radio' if qtype == 'single' else 'checkbox' %}
+{% if not rows %}{% set rows = [''] %}{% endif %}
+
+<article class="question-block card" data-index="{{ index }}">
+  <header class="question-head">
+    <span class="question-number">{{ index + 1 }}</span>
+    {# Подпись вложена в <label>, а не связана через for/id: блок
+       заготовки тоже рендерится с index=0, и при клонировании второй
+       select получил бы дублирующий id. Вложенный label работает без id. #}
+    <label class="question-type-label">
+      <span>Тип вопроса:</span>
+      <select class="question-type" name="q{{ index }}_type" aria-label="Тип вопроса">
+        {% for value, label in types %}
+        <option value="{{ value }}" {% if qtype == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="inline-check">
+      <input type="checkbox" class="question-required" name="q{{ index }}_is_required"
+             value="1" {% if q.is_required %}checked{% endif %}> Обязательный
+    </label>
+    <button type="button" class="btn btn-sm btn-danger js-remove" title="Удалить вопрос">&times;</button>
+  </header>
+
+  <div class="field">
+    <input type="text" class="question-text" name="q{{ index }}_text" maxlength="500"
+           placeholder="Текст вопроса" required value="{{ q.text or '' }}">
+  </div>
+  <p class="field-error" data-error-for="q{{ index }}">{{ errors.get('q' ~ index, '') }}</p>
+
+  <div class="field question-image-field">
+    <span class="frame-label">Картинка к вопросу</span>
+    {% if q.image %}
+    <div class="image-current">
+      <img class="image-current-preview" src="/media/{{ q.image }}" alt="Картинка вопроса">
+      <div class="image-current-actions">
+        <input type="hidden" name="q{{ index }}_image_keep" value="{{ q.image }}">
+        <label class="checkbox-row">
+          <input type="checkbox" name="q{{ index }}_image_clear" value="1">
+          <span>Убрать картинку</span>
+        </label>
+      </div>
+    </div>
+    {% endif %}
+    <label class="file-field">
+      <span class="muted small">PNG, JPEG, WebP или GIF, до 2 МБ. Необязательно.</span>
+      <input type="file" name="q{{ index }}_image" accept="image/png,image/jpeg,image/webp,image/gif">
+    </label>
+  </div>
+
+  <div class="question-choices" data-for="single,multiple" {% if qtype not in ['single', 'multiple'] %}hidden{% endif %}>
+    <span class="frame-label">Варианты ответа</span>
+    <p class="field-hint js-review-hint">Отметьте «верно» у правильных вариантов — они попадут в зачёт.</p>
+    <div class="choice-rows" data-choice-rows>
+      {% for choice in rows %}
+      <div class="choice-row">
+        <input type="{{ marker }}" class="choice-mark" disabled tabindex="-1" aria-hidden="true">
+        <input type="text" class="choice-text" maxlength="300"
+               placeholder="Вариант ответа" value="{{ choice }}">
+        <label class="choice-correct js-review-only" title="Правильный вариант">
+          <input type="checkbox" class="choice-correct-check js-review-only"
+                 data-choice-text="{{ choice }}" {% if choice in q.correct_choices %}checked{% endif %}>
+          <span>верно</span>
+        </label>
+        <button type="button" class="choice-remove js-remove-choice" title="Убрать вариант">&times;</button>
+      </div>
+      {% endfor %}
+    </div>
+    <button type="button" class="btn btn-sm btn-ghost js-add-choice">+ Вариант ответа</button>
+    <input type="hidden" class="choices-value" name="q{{ index }}_choices" value="{{ rows | join('\n') }}">
+    <input type="hidden" class="correct-value" name="q{{ index }}_correct"
+           value="{{ q.correct_choices | join('\n') }}">
+  </div>
+
+  <div class="question-yesno" data-for="yes_no" {% if qtype != 'yes_no' %}hidden{% endif %}>
+    <span class="frame-label">Ответ «Да» или «Нет»</span>
+    <div class="choice-rows">
+      {% for label in yes_no_labels %}
+      <div class="choice-row is-fixed">
+        <input type="radio" class="choice-mark" disabled tabindex="-1" aria-hidden="true">
+        <span class="choice-label">{{ label }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="field js-review-only">
+      <label>Верный ответ</label>
+      <select class="correct-yesno js-review-only" name="q{{ index }}_correct_yes_no">
+        <option value="">Не оценивать</option>
+        {% for label in yes_no_labels %}
+        <option value="{{ label }}" {% if q.correct_value_text == label %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+
+  <div class="question-scale" data-for="scale" {% if qtype != 'scale' %}hidden{% endif %}>
+    <div class="field">
+      <label>Шкала</label>
+      <select class="question-scale-select" name="q{{ index }}_scale">
+        {% for value, label in scales %}
+        <option value="{{ value }}" {% if (q.scale or '1-10') == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="scale" data-scale-frame></div>
+    <div class="field js-review-only">
+      <label>Верное значение</label>
+      <input type="number" class="correct-scale js-review-only" name="q{{ index }}_correct_scale"
+             min="1" max="10" placeholder="Не оценивать"
+             value="{{ q.correct_value_int if q.correct_value_int is not none else '' }}">
+    </div>
+  </div>
+
+  <div class="question-open" data-for="text" {% if qtype != 'text' %}hidden{% endif %}>
+    <span class="frame-label">Свободный ответ</span>
+    <textarea rows="5" disabled placeholder="Участник впишет ответ сюда"></textarea>
+    <p class="field-hint">Участник увидит такое же широкое поле на странице анкеты.</p>
+  </div>
+
+  <div class="field question-explanation js-review-only">
+    <label>Пояснение к правильному ответу</label>
+    <textarea class="question-explanation-text js-review-only" name="q{{ index }}_explanation"
+              rows="2" maxlength="1000"
+              placeholder="Показывается респонденту в режиме «Балл и правильные ответы»">{{ q.explanation or '' }}</textarea>
+  </div>
+</article>
