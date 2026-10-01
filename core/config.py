@@ -98,7 +98,11 @@ class Settings(BaseSettings):
 
     app_name: str = "ЧЕСТНО"
     debug: bool = True
-    host: str = "127.0.0.1"
+    # Слушаем все интерфейсы, а не только свой компьютер: иначе ссылка на
+    # анкету открывается лишь у того, кто её создал, и телефон в той же сети
+    # её не видит. В локальной сети это безопасно, а для публикации в
+    # интернете всё равно нужен HTTPS перед приложением.
+    host: str = "0.0.0.0"
     port: int = 8000
 
     database_url: str = Field(default_factory=default_database_url)

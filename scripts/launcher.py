@@ -69,6 +69,24 @@ def open_browser_later(url: str, delay: float = 1.5) -> None:
     threading.Thread(target=_open, daemon=True).start()
 
 
+def lan_address() -> str | None:
+    """IP-адрес этого компьютера в локальной сети, если он есть.
+
+    Нужен, чтобы человек сразу увидел ссылку, которую можно раздать
+    телефону или соседскому ноутбуку. Адрес 127.0.0.1 для этого бесполезен:
+    на чужом устройстве он указывает на само это устройство.
+    """
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            # Соединение не устанавливается: UDP отправляет только адрес
+            # назначения, поэтому маршрут выбирается без выхода в сеть.
+            sock.connect(("10.255.255.255", 1))
+            address = sock.getsockname()[0]
+    except OSError:
+        return None
+    return None if address.startswith("127.") else address
+
+
 def main() -> int:
     # Без этого print буферизуется, и при перенаправлении вывода в файл
     # сообщения появляются только после завершения процесса.
@@ -112,6 +130,13 @@ def main() -> int:
 
     print(f"  Сайт:      {base}")
     print(f"  Вход:      {base}/login")
+
+    lan = lan_address()
+    if lan:
+        print()
+        print(f"  В локальной сети:  http://{lan}:{port}")
+        print("  Ссылку с /s/ можно открыть с телефона или другого")
+        print("  устройства в этой же сети. Из интернета она недоступна.")
     if has_admin:
         print()
         print("  Создана учётка администратора: логин admin, пароль admin.")
