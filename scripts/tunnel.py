@@ -1,4 +1,4 @@
-"""Запуск сервера вместе с туннелем Cloudflare.
+"""Запуск сервера вместе с туннелем в интернет.
 
 Зачем отдельный запуск, если есть `start.bat`: туннель нужен не всегда, а
 показывать его в обычном окне запуска значило бы путать человека лишним
@@ -13,22 +13,34 @@
 кто открыл репозиторий. Управляет тем, кто включает компьютер, тот, кто
 сидит за ним, — и это единственное разумное разделение.
 
-Тоннель бесплатный и поддомен в нём случайный: адрес меняется при каждом
-запуске, и старую ссылку открыть уже нельзя. Постоянный адрес требует
-своего домена и именованного туннеля, это отдельная задача.
+## Почему LocalTunnel, а не Cloudflare
+
+Cloudflare был основным вариантом и на этой машине перестал работать: туннель
+регистрируется (`Registered tunnel connection`), но край отдаёт 530 с
+кодом 1033 — «туннель не найден». Проверено и без VPN, и через VPN, то есть
+дело не в сети региона, а в самом бесплатном quick-туннеле Cloudflare.
+
+Cloudflare поэтому оставлен как запасной вариант и включается только явно:
+`python -m scripts.tunnel --cloudflare`. Молчаливого переключения на
+заведомо нерабочий вариант нет намеренно: человек должен знать, чем он
+пользуется.
+
+Поддомен в обоих случаях случайный: адрес меняется при каждом запуске, и
+старую ссылку открыть уже нельзя. Постоянный адрес требует своего домена и
+именованного туннеля, это отдельная задача.
 """
 
 from __future__ import annotations
 
+import argparse
 import re
 import subprocess
 import sys
 import threading
 import time
-import webbrowser
+from dataclasses import dataclass
 from pathlib import Path
 
-from auth.service import ensure_admin_account
 from core.config import configure_logging, settings
 from scripts.launcher import (
     _fail,
@@ -38,10 +50,15 @@ from scripts.launcher import (
     port_is_free,
 )
 
-# Адрес quick-туннеля печатается в выводе cloudflared строкой вида
-# `https://длинное-слово-1234.trycloudflare.com`. Разбирать вывод проще,
-# чем поднимать локальный API-клиент туннеля.
-URL_PATTERN = re.compile(r"https://[a-z0-9-]+\.trycloudflare\.com")
+# LocalTunnel печатает адрес в stdout строкой `your url is: https://x.loca.lt`,
+# cloudflared пишет в stderr рамку с `https://x.trycloudflare.com`.
+LOCALTUNNEL_URL = re.compile(r"https://[a-z0-9-]+\.loca\.lt")
+CLOUDFLARE_URL = re.compile(r"https://[a-z0-9-]+\.trycloudflare\.com")
+
+# Первый запуск докачивает пакет localtunnel с npm, поэтому адрес появляется
+# заметно позже, чем при повторных запусках.
+LOCALTUNNEL_URL_TIMEOUT = 240.0
+CLOUDFLARE_URL_TIMEOUT = 60.0
 
 CLOUDFLARED = "cloudflared"
 
@@ -52,11 +69,20 @@ WELL_KNOWN_PATHS = (
     r"C:\Program Files\cloudflared\cloudflared.exe",
 )
 
-INSTALL_HINT = (
+CLOUDFLARE_HINT = (
     "Установите туннель и попробуйте снова:",
     "  winget install --id Cloudflare.cloudflared",
     "После установки перезапустите это окно.",
 )
+
+
+@dataclass
+class Tunnel:
+    """Запущенный туннель: процесс и выданный им публичный адрес."""
+
+    process: subprocess.Popen[str]
+    url: str
+    provider: str
 
 
 def cloudflared_path() -> str | None:
@@ -72,47 +98,128 @@ def cloudflared_path() -> str | None:
     return None
 
 
-def read_tunnel_url(
-    process: subprocess.Popen[str],
+def _watch_for_url(
+    stream: "object",
+    pattern: re.Pattern[str],
     holder: dict[str, str],
     found: threading.Event,
 ) -> None:
-    """Читает stderr туннеля и запоминает публичный адрес.
-
-    cloudflared пишет всё в stderr, поэтому stdout не перехватываем.
-    Событие ставится в конце, после печати адреса: иначе основной поток
-    успевает допечатать своё поверх рамки с адресом.
-    """
-    assert process.stderr is not None
-    for line in process.stderr:
-        match = URL_PATTERN.search(line)
+    """Читает поток туннеля и запоминает публичный адрес."""
+    for line in stream:
+        match = pattern.search(line)
         if match and "url" not in holder:
             holder["url"] = match.group(0)
-            print()
-            print("  " + "=" * 62)
-            print()
-            print(f"   {holder['url']}")
-            print()
-            print("  " + "=" * 62)
-            print()
-            print("  Открывайте анкеты по этому адресу: ссылки, которые")
-            print("  вы скопируете в кабинете, будут начинаться с него.")
-            print()
-            print("  ВНИМАНИЕ: адрес случайный и меняется при каждом запуске.")
-            print("  Старые ссылки после перезапуска перестанут открываться.")
-            print("  Ссылка работает, пока открыто это окно и включён")
-            print("  компьютер.")
-            print()
             found.set()
+
+
+def _await_url(
+    process: subprocess.Popen[str],
+    stream: "object",
+    pattern: re.Pattern[str],
+    timeout: float,
+) -> str:
+    holder: dict[str, str] = {}
+    found = threading.Event()
+    threading.Thread(
+        target=_watch_for_url, args=(stream, pattern, holder, found), daemon=True
+    ).start()
+    if not found.wait(timeout=timeout):
+        raise TimeoutError("туннель не выдал публичный адрес")
+    return holder["url"]
+
+
+def start_localtunnel(port: int, npx: Path) -> Tunnel:
+    """Поднимает LocalTunnel и возвращает публичный адрес."""
+    command = [
+        str(npx),
+        "-y",
+        "localtunnel",
+        "--port",
+        str(port),
+    ]
+    process = subprocess.Popen(  # noqa: S603 - путь проверен, аргументы фиксированы
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    try:
+        url = _await_url(
+            process,
+            process.stdout,
+            LOCALTUNNEL_URL,
+            LOCALTUNNEL_URL_TIMEOUT,
+        )
+    except TimeoutError:
+        _terminate(process)
+        raise
+    return Tunnel(process=process, url=url, provider="LocalTunnel")
+
+
+def start_cloudflared(port: int, executable: str) -> Tunnel:
+    """Поднимает Cloudflare quick-туннель и возвращает публичный адрес."""
+    process = subprocess.Popen(  # noqa: S603 - путь проверен, аргументы фиксированы
+        [
+            executable,
+            "tunnel",
+            "--url",
+            f"http://127.0.0.1:{port}",
+            # Протокол задан явно. Замеры на этой машине: дефолтный QUIC не
+            # смог зарегистрироваться вовсе ("Register tunnel error from server
+            # side: context deadline exceeded"), а HTTP/2 регистрируется всегда.
+            "--protocol",
+            "http2",
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    try:
+        url = _await_url(
+            process,
+            process.stderr,
+            CLOUDFLARE_URL,
+            CLOUDFLARE_URL_TIMEOUT,
+        )
+    except TimeoutError:
+        _terminate(process)
+        raise
+    return Tunnel(process=process, url=url, provider="Cloudflare")
+
+
+def _terminate(process: subprocess.Popen[str]) -> None:
+    """Останавливает туннель вместе со всеми его дочерними процессами.
+
+    npx запускает node отдельным процессом, и terminate на родителе оставил бы
+    его жить: порт оставался бы занят, а туннель — отвечать.
+    """
+    if process.poll() is not None:
+        return
+    if sys.platform == "win32":
+        subprocess.run(
+            ["taskkill", "/T", "/F", "/PID", str(process.pid)],
+            capture_output=True,
+            check=False,
+        )
+    else:
+        process.terminate()
+    try:
+        process.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        process.kill()
 
 
 def wait_until_serving(url: str, timeout: float = 120.0) -> bool:
     """Ждёт, пока адрес начнёт отвечать.
 
-    Cloudflare выдаёт имя туннеля раньше, чем край начинает его отдавать.
-    Первые полминуты по ссылке приходит ошибка 530, и человек успевает
-    решить, что всё сломалось, и закрыть окно. Поэтому ждём рабочего
-    ответа и только потом говорим, что можно открывать.
+    Туннель выдаёт имя раньше, чем край начинает его отдавать. Первые
+    полминуты по ссылке приходит ошибка, и человек успевает решить, что всё
+    сломалось, и закрыть окно. Поэтому ждём рабочего ответа и только потом
+    говорим, что можно открывать.
     """
     import urllib.error
     import urllib.request
@@ -131,9 +238,38 @@ def wait_until_serving(url: str, timeout: float = 120.0) -> bool:
     return False
 
 
+def _describe_install_notice() -> list[str]:
+    """Что скачивается при первом запуске туннеля, нормальным языком."""
+    return [
+        "Первый запуск скачает две вещи, обе нужны только для туннеля:",
+        "",
+        "  1. Node.js — программа, на которой туннель работает.",
+        "     Официальный сайт nodejs.org, около 38 МБ, без прав администратора.",
+        "  2. LocalTunnel — сам туннель, маленькая программа с npm.",
+        "",
+        "Ваше участие не нужно: всё поставится само. Файлы безопасные,",
+        "качаются по HTTPS и сверяются с официальными контрольными суммами.",
+        "Интернет не отключайте, пока идёт загрузка.",
+        "",
+        "Обычному запуску start.bat ничего из этого не требуется.",
+    ]
+
+
 def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Запуск сайта вместе с туннелем в интернет.",
+    )
+    parser.add_argument(
+        "--cloudflare",
+        action="store_true",
+        help="запасной вариант: туннель Cloudflare вместо LocalTunnel",
+    )
+    args = parser.parse_args()
+
     try:
-        sys.stdout.reconfigure(line_buffering=True)
+        # Кодировка задаётся явно: иначе текст уходит в системную кодировку
+        # и в окне запуска рассыпается на русском.
+        sys.stdout.reconfigure(line_buffering=True, encoding="utf-8", errors="replace")
     except (AttributeError, ValueError):
         pass
 
@@ -145,17 +281,41 @@ def main() -> int:
     print("  " + "-" * 40)
     print()
 
-    executable = cloudflared_path()
-    if executable is None:
-        return _fail(
-            [
-                "Не найден cloudflared — без него туннель не поднять.",
-                "",
-                *INSTALL_HINT,
-                "",
-                "Обычный запуск без туннеля: start.bat",
-            ]
-        )
+    provider = "Cloudflare" if args.cloudflare else "LocalTunnel"
+
+    if args.cloudflare:
+        executable = cloudflared_path()
+        if executable is None:
+            return _fail(
+                [
+                    "Не найден cloudflared — без него туннель не поднять.",
+                    "",
+                    *CLOUDFLARE_HINT,
+                    "",
+                    "Обычный запуск без туннеля: start.bat",
+                ]
+            )
+        tool: Path | str = executable
+    else:
+        from scripts import node_setup
+
+        existing = node_setup.find_npx()
+        if existing is not None and node_setup.npx_works(existing):
+            tool = existing
+        else:
+            print()
+            for line in _describe_install_notice():
+                print(f"  {line}" if line else "")
+            print()
+            print("  Начинаю. Это займёт около минуты.")
+            print()
+            try:
+                tool = node_setup.install_node(
+                    notify=lambda line: print(f"  {line}")
+                )
+            except node_setup.NodeSetupError as error:
+                return _fail([str(error), "", "Обычный запуск: start.bat"])
+            print()
 
     if not port_is_free(host, port):
         other = free_port_suggestion(host, port)
@@ -173,6 +333,8 @@ def main() -> int:
     create_all()
 
     with SessionLocal() as session:
+        from auth.service import ensure_admin_account
+
         has_admin = ensure_admin_account(session) is not None
 
     import uvicorn
@@ -182,67 +344,48 @@ def main() -> int:
     server_thread = threading.Thread(target=server.run, daemon=True)
     server_thread.start()
 
-    print("  Сервер поднят, запускаю туннель...")
-    # Протокол задан явно. Замеры на этой машине: дефолтный QUIC не смог
-    # зарегистрироваться вовсе ("Register tunnel error from server side:
-    # context deadline exceeded"), а HTTP/2 регистрируется всегда, поэтому
-    # берём его. Соединение всё равно может рваться с стороны сети или
-    # Cloudflare - это не лечится протоколом, скрипт лишь честно ждёт
-    # готовности адреса и не открывает браузер на 530.
-    # Запускаем именно найденный путь, а не имя: winget кладёт бинарник в
-    # Program Files (x86) и не добавляет папку в PATH, а подстановка в
-    # `subprocess` ищет только по PATH и падает с WinError 2.
-    tunnel = subprocess.Popen(  # noqa: S603 - путь найден выше, аргументы фиксированы
-        [
-            executable,
-            "tunnel",
-            "--url",
-            f"http://127.0.0.1:{port}",
-            "--protocol",
-            "http2",
-        ],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.PIPE,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-    )
-
-    found = threading.Event()
-    holder: dict[str, str] = {}
-    reader = threading.Thread(
-        target=read_tunnel_url, args=(tunnel, holder, found), daemon=True
-    )
-    reader.start()
-
     lan = lan_address()
     if lan:
         print(f"  В своей сети сайт и так доступен: http://{lan}:{port}")
         print("  Туннель нужен, только если показываете из интернета.")
     print()
-    print("  Жду публичный адрес...")
+    print(f"  Запускаю туннель {provider}...")
 
-    # Адрес появляется за несколько секунд; если туннель не поднялся,
-    # сообщаем об этом, а не молчим вечно.
-    if not found.wait(timeout=60):
-        print()
-        print("  Туннель не ответил за минуту. Проверьте подключение")
-        print("  к интернету и попробуйте ещё раз.")
-        tunnel.terminate()
+    tunnel: Tunnel | None = None
+    try:
+        tunnel = start_cloudflared(port, str(tool)) if args.cloudflare else start_localtunnel(port, Path(tool))
+    except (TimeoutError, OSError) as error:
         server.should_exit = True
-        return 1
+        server_thread.join(timeout=10)
+        return _fail([f"Туннель {provider} не поднялся: {error}", "", "Обычный запуск: start.bat"])
 
-    public = holder["url"]
+    public = tunnel.url
+    print()
+    print("  " + "=" * 62)
+    print()
+    print(f"   {public}")
+    print()
+    print("  " + "=" * 62)
+    print()
+    print("  Открывайте анкеты по этому адресу: ссылки, которые")
+    print("  вы скопируете в кабинете, будут начинаться с него.")
+    print()
+    print("  ВНИМАНИЕ: адрес случайный и меняется при каждом запуске.")
+    print("  Старые ссылки после перезапуска перестанут открываться.")
+    print("  Ссылка работает, пока открыто это окно и включён")
+    print("  компьютер.")
+    if args.cloudflare:
+        print()
+        print("  Cloudflare — запасной вариант, на этой машине он может")
+        print("  отдавать ошибку 530. Если так, запустите без --cloudflare.")
+    print()
 
-    # Адрес выдан, но край Cloudflare ещё не начал его отдавать: первые
-    # полминуты по ссылке приходит 530. Не открываем браузер на заведомо
-    # нерабочий адрес и ждём настоящей готовности.
     if wait_until_serving(public):
         print()
         print("  Ссылка отвечает, можно открывать.")
     else:
         print()
-        print("  Адрес выдан, но край Cloudflare не отвечает уже две минуты.")
+        print("  Адрес выдан, но край не отвечает уже две минуты.")
         print("  Подождите минуту и обновите страницу, либо попробуйте")
         print("  ещё раз: иногда такое бывает при слабом интернете.")
     print()
@@ -258,7 +401,7 @@ def main() -> int:
     print()
 
     try:
-        while not tunnel.poll() is not None:
+        while tunnel.process.poll() is None:
             time.sleep(0.5)
     except KeyboardInterrupt:
         print()
@@ -266,15 +409,7 @@ def main() -> int:
     finally:
         # Туннель гасим первым: иначе он секунду-другую продолжит
         # принимать запросы в уже остановившееся приложение.
-        for process in (tunnel, None):
-            if process is None:
-                break
-            if process.poll() is None:
-                process.terminate()
-                try:
-                    process.wait(timeout=10)
-                except subprocess.TimeoutExpired:
-                    process.kill()
+        _terminate(tunnel.process)
         server.should_exit = True
         server_thread.join(timeout=10)
 
