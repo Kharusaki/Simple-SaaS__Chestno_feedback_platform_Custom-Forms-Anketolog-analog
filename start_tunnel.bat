@@ -12,32 +12,72 @@ cd /d "%~dp0"
 
 set "PY=%~dp0.venv\Scripts\python.exe"
 
-if not exist "%PY%" (
-    echo.
-    echo [1/2] Creating virtual environment, this takes about a minute...
-    python -m venv .venv
-    if errorlevel 1 goto :no_python
-    "%PY%" -m pip install --quiet --upgrade pip
-    "%PY%" -m pip install --quiet -r requirements.txt
-    if errorlevel 1 goto :failed
-) else (
-    "%PY%" -c "import fastapi, uvicorn" >nul 2>&1
-    if errorlevel 1 (
-        echo.
-        echo [1/2] Installing dependencies, this takes about a minute...
-        "%PY%" -m pip install --quiet -r requirements.txt
-        if errorlevel 1 goto :failed
-    )
-)
+if exist "%PY%" goto :have_venv
 
+rem No virtual environment yet, so we need a system Python to build it.
+call :find_python
+if not defined BOOTPY (
+    echo.
+    echo [1/3] Python 3.12 is not installed. Installing it now,
+    echo       about 2 minutes, no administrator rights needed.
+    echo.
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\install_python.ps1"
+    if errorlevel 1 goto :no_python
+    call :find_python
+)
+if not defined BOOTPY goto :no_python
+
+echo.
+echo [2/3] Creating virtual environment, about a minute...
+%BOOTPY% -m venv .venv
+if errorlevel 1 goto :no_python
+"%PY%" -m pip install --quiet --upgrade pip
+"%PY%" -m pip install --quiet -r requirements.txt
+if errorlevel 1 goto :failed
+goto :run
+
+:have_venv
+"%PY%" -c "import fastapi, uvicorn" >nul 2>&1
+if not errorlevel 1 goto :run
+echo.
+echo [1/3] Installing dependencies, about a minute...
+"%PY%" -m pip install --quiet -r requirements.txt
+if errorlevel 1 goto :failed
+
+:run
+echo [3/3] Starting.
+echo.
 "%PY%" -m scripts.tunnel
 if errorlevel 1 goto :failed
 exit /b 0
 
+rem Finds a usable Python 3.12 or newer and puts the command in BOOTPY.
+rem The value can contain arguments ("py -3"), so it is never quoted as a
+rem single path: callers use it as "%BOOTPY% -m venv" instead.
+:find_python
+set "BOOTPY="
+call :try_python py -3.12
+if defined BOOTPY goto :eof
+call :try_python py -3
+if defined BOOTPY goto :eof
+call :try_python python
+goto :eof
+
+:try_python
+%1 -c "import sys" >nul 2>&1
+if errorlevel 1 goto :eof
+set "VER="
+for /f "usebackq delims=" %%v in (`%1 -c "import sys; print(sys.version_info[0]*100+sys.version_info[1])" 2^>nul`) do set "VER=%%v"
+if not defined VER goto :eof
+if %VER% LSS 312 goto :eof
+set "BOOTPY=%1"
+goto :eof
+
 :no_python
 echo.
-echo Python 3.12 not found. Install it with "Add Python to PATH" checked,
-echo then run this file again.
+echo Python could not be installed. Check the internet connection and try
+echo again, or install Python 3.12 from https://www.python.org/downloads/
+echo and tick "Add Python to PATH" during setup.
 pause
 exit /b 1
 

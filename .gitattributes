@@ -14,6 +14,12 @@
 *.bat text eol=crlf
 *.cmd text eol=crlf
 
+# Установщик Python для .bat. В нём нет BOM намеренно: без него
+# Windows PowerShell 5.1 читает файл в ANSI-кодировке и печатает вместо
+# букв мусор, поэтому текст внутри только ASCII. Переносы строки CRLF,
+# как у .bat, - их и пишет сам редактор.
+*.ps1 text eol=crlf
+
 # Python-исходники всегда с LF, даже если в системе включён autocrlf.
 *.py text eol=lf
 
